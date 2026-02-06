@@ -35,6 +35,9 @@
         @keyframes fly { 0% { transform: translateX(-100%); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateX(100%); opacity: 0; } }
         .fade-enter-active, .fade-leave-active { transition: opacity 0.5s ease; }
         .fade-enter-from, .fade-leave-to { opacity: 0; }
+        .list-move, .list-enter-active, .list-leave-active { transition: all 0.5s ease; }
+        .list-enter-from, .list-leave-to { opacity: 0; transform: translateX(30px); }
+        .list-leave-active { position: absolute; }
         .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.95); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
     </style>
 </head>
@@ -46,7 +49,7 @@
         <div v-if="isLoading" class="loading-overlay">
             <i class="fa-solid fa-cloud-arrow-down text-4xl text-[#5d6b5b] mb-4 animate-bounce"></i>
             <p class="text-sm font-bold text-gray-500">正在連接資料庫...</p>
-            <p class="text-xs text-gray-400 mt-2">v28 日本地圖版</p>
+            <p class="text-xs text-gray-400 mt-2">v29 智能排序版</p>
             <button v-if="showSkipButton" @click="forceEnter" class="mt-6 border border-gray-300 px-4 py-2 rounded-full text-xs text-gray-400 hover:bg-gray-50">
                 連線逾時？點此離線進入
             </button>
@@ -56,7 +59,11 @@
             <div class="absolute -right-10 -top-10 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
             <div class="flex justify-between items-center relative z-10">
                 <div>
-                    <h1 class="text-3xl font-black tracking-widest text-white drop-shadow-md mb-1">KOBE <span class="text-[10px] bg-green-400 text-green-900 px-1.5 rounded ml-1 align-middle">ONLINE</span></h1>
+                    <h1 class="text-3xl font-black tracking-widest text-white drop-shadow-md mb-1">KOBE 
+                        <span :class="['text-[10px] px-1.5 rounded ml-1 align-middle font-bold transition-colors duration-500', isOnline ? 'bg-green-400 text-green-900' : 'bg-gray-400 text-gray-800']">
+                            {{ isOnline ? 'ONLINE' : 'OFFLINE' }}
+                        </span>
+                    </h1>
                     <div class="flex items-center gap-2">
                          <span class="text-[10px] bg-[#b86e6e] px-2 py-0.5 rounded text-white font-bold tracking-wider shadow-sm">2026</span>
                          <span class="text-sm font-bold text-gray-100 tracking-wider">{{ getDayLabel(selectedDate) }}</span>
@@ -90,18 +97,21 @@
                         <button @click="addCheckItem" class="bg-[#5d6b5b] text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform"><i class="fa-solid fa-plus"></i></button>
                     </div>
                     <div class="space-y-2">
-                        <div v-for="item in checklistItems" :key="item.id" class="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors group">
-                            <div class="flex items-center">
-                                <input type="checkbox" v-model="item.checked" @change="syncToCloud" class="w-5 h-5 rounded-md border-gray-300 text-[#b86e6e] focus:ring-[#b86e6e] custom-checkbox transition-all cursor-pointer">
+                        <transition-group name="list" tag="div">
+                            <div v-for="item in sortedChecklist" :key="item.id" class="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors group mb-2">
+                                <div class="flex items-center">
+                                    <input type="checkbox" v-model="item.checked" @change="syncToCloud" class="w-5 h-5 rounded-md border-gray-300 text-[#b86e6e] focus:ring-[#b86e6e] custom-checkbox transition-all cursor-pointer">
+                                </div>
+                                <div v-if="editingCheckItemId === item.id" class="flex-1 ml-3">
+                                    <input :id="'check-input-' + item.id" type="text" v-model="editingCheckItemText" @blur="saveCheckItem" @keyup.enter="saveCheckItem" class="w-full bg-white border-2 border-[#5d6b5b] rounded px-2 py-1 text-sm outline-none shadow-sm text-gray-700 font-bold">
+                                </div>
+                                <div v-else @click="editCheckItem(item)" class="flex-1 ml-3 cursor-text py-1">
+                                    <span :class="['text-sm font-medium transition-all block', item.checked ? 'text-gray-300 line-through' : 'text-gray-700']">{{ item.text }}</span>
+                                </div>
+                                <button @click="deleteCheckItem(item.id)" class="text-gray-300 hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition-opacity ml-2"><i class="fa-solid fa-xmark"></i></button>
                             </div>
-                            <div v-if="editingCheckItemId === item.id" class="flex-1 ml-3">
-                                <input :id="'check-input-' + item.id" type="text" v-model="editingCheckItemText" @blur="saveCheckItem" @keyup.enter="saveCheckItem" class="w-full bg-white border-2 border-[#5d6b5b] rounded px-2 py-1 text-sm outline-none shadow-sm text-gray-700 font-bold">
-                            </div>
-                            <div v-else @click="editCheckItem(item)" class="flex-1 ml-3 cursor-text py-1">
-                                <span :class="['text-sm font-medium transition-all block', item.checked ? 'text-gray-300 line-through' : 'text-gray-700']">{{ item.text }}</span>
-                            </div>
-                            <button @click="deleteCheckItem(item.id)" class="text-gray-300 hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition-opacity ml-2"><i class="fa-solid fa-xmark"></i></button>
-                        </div>
+                        </transition-group>
+                        <div v-if="sortedChecklist.length === 0" class="text-center text-gray-300 text-xs py-4">沒有待辦事項</div>
                     </div>
                 </div>
             </div>
@@ -231,7 +241,7 @@
                             </div>
                             <div class="bg-white p-5 rounded-[1.2rem] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.05)] border border-gray-100 relative transition-transform active:scale-[0.99]">
                                 <h3 class="text-lg font-bold text-gray-800 mb-1 leading-snug">{{ item.title }}</h3>
-                                <a v-if="item.location" :href="'http://googleusercontent.com/maps.google.com/7' + encodeURIComponent(item.location)" target="_blank"
+                                <a v-if="item.location" :href="'http://googleusercontent.com/maps.google.com/8' + encodeURIComponent(item.location)" target="_blank"
                                    class="inline-flex items-center gap-1.5 text-xs font-bold text-[#b86e6e] hover:bg-[#b86e6e]/10 px-2 py-1 rounded-lg -ml-2 transition-colors"><i class="fa-solid fa-location-dot"></i> {{ item.location }}</a>
                                 <div v-if="item.notes" class="mt-3 text-sm text-gray-600 bg-[#f9f9f7] p-3 rounded-xl leading-relaxed whitespace-pre-line border-l-2 border-[#dcdcdc]">{{ item.notes }}</div>
                                 <div class="absolute top-4 right-4 flex gap-3 opacity-30 group-hover:opacity-100 transition-opacity">
@@ -321,6 +331,7 @@
             const showSkipButton = ref(false);
             const editingCheckItemId = ref(null);
             const editingCheckItemText = ref('');
+            const isOnline = ref(false); // 連線狀態
 
             const dates = [ { key: '2026-03-05', label: '3/5 (四)' }, { key: '2026-03-06', label: '3/6 (五)' }, { key: '2026-03-07', label: '3/7 (六)' }, { key: '2026-03-08', label: '3/8 (日)' } ];
             const selectedDate = ref('2026-03-05'); 
@@ -350,16 +361,13 @@
 
             let map = null; let markers = [];
             
-            // GSI Maps Tile Layer (日本國土地理院)
             const initMap = () => { 
                 if(map) return; 
-                map = L.map('map', { zoomControl: false }).setView([34.6946, 135.1955], 14); // 調整縮放層級
-                
+                map = L.map('map', { zoomControl: false }).setView([34.6946, 135.1955], 14); 
                 L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">GSI Japan</a>',
                     maxZoom: 18
                 }).addTo(map);
-                
                 L.control.zoom({ position: 'bottomright' }).addTo(map); 
                 updateMapMarkers(); 
             };
@@ -413,6 +421,13 @@
             const totalTWD = computed(() => expenses.value.reduce((acc, exp) => acc + (Number(exp.amount) * (exp.fixedRate || exchangeRate.value)), 0));
             const remainingCash = computed(() => cashBudget.value - expenses.value.filter(e => e.method === 'cash').reduce((acc, e) => acc + Number(e.amount), 0));
             const groupedExpenses = computed(() => { const groups = {}; [...expenses.value].sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(exp => { if(!groups[exp.date]) { const dateObj = dates.find(d => d.key === exp.date); groups[exp.date] = { date: exp.date, label: dateObj ? dateObj.label : exp.date, items: [], subtotal: 0 }; } groups[exp.date].items.push(exp); groups[exp.date].subtotal += Number(exp.amount); }); return Object.values(groups); });
+            
+            // 自動排序邏輯：未完成在先，已完成在後
+            const sortedChecklist = computed(() => {
+                return [...checklistItems.value].sort((a, b) => {
+                    return (a.checked === b.checked) ? 0 : a.checked ? 1 : -1;
+                });
+            });
 
             watch(selectedDate, () => { if(flightData[selectedDate.value]) { currentFlightStatus.value = '更新中...'; setTimeout(() => { currentFlightStatus.value = selectedDate.value === '2026-03-05' ? '準點 On Time' : '計劃中 Scheduled'; }, 800); } newItem.value.dateKey = selectedDate.value; if(currentTab.value === 'map') updateMapMarkers(); });
 
@@ -420,7 +435,7 @@
             function deleteItinerary(id) { if(confirm('確定要刪除？')) { itinerary.value = itinerary.value.filter(i => i.id !== id); syncToCloud(); } }
             function deleteExpense(id) { expenses.value = expenses.value.filter(i => i.id !== id); syncToCloud(); }
             
-            // 強制進入 (離線模式)
+            // 強制進入
             function forceEnter() {
                 isLoading.value = false;
                 alert('已切換至離線模式。資料可能不會同步。');
@@ -428,8 +443,17 @@
 
             // Initialize
             onMounted(() => {
-                // 超時機制
                 setTimeout(() => { if(isLoading.value) showSkipButton.value = true; }, 5000);
+
+                // 監聽連線狀態
+                const connectedRef = firebase.database().ref(".info/connected");
+                connectedRef.on("value", (snap) => {
+                    if (snap.val() === true) {
+                        isOnline.value = true;
+                    } else {
+                        isOnline.value = false;
+                    }
+                });
 
                 const dataRef = firebase.database().ref('kobeTripData');
                 dataRef.on('value', (snapshot) => {
@@ -451,7 +475,7 @@
                 fetchWeather(); fetchRate();
             });
 
-            return { currentTab, showModal, dates, selectedDate, exchangeRate, itinerary, expenses, newItem, newExpense, weatherData, checklistItems, newCheckItem, editingId, categories, currentDateItinerary, totalExpense, currentWeather, totalTWD, cashBudget, remainingCash, groupedExpenses, currentFlight, currentFlightStatus, saveItem, deleteItinerary, deleteExpense, switchTab, addCheckItem, deleteCheckItem, openAddModal, editItinerary, formatNumber, formatDate, getWeatherIcon, getDayLabel, fetchRate, getCategoryIcon, isLoading, showSkipButton, forceEnter, syncToCloud, editingCheckItemId, editingCheckItemText, editCheckItem, saveCheckItem };
+            return { currentTab, showModal, dates, selectedDate, exchangeRate, itinerary, expenses, newItem, newExpense, weatherData, checklistItems, newCheckItem, editingId, categories, currentDateItinerary, totalExpense, currentWeather, totalTWD, cashBudget, remainingCash, groupedExpenses, currentFlight, currentFlightStatus, saveItem, deleteItinerary, deleteExpense, switchTab, addCheckItem, deleteCheckItem, openAddModal, editItinerary, formatNumber, formatDate, getWeatherIcon, getDayLabel, fetchRate, getCategoryIcon, isLoading, showSkipButton, forceEnter, syncToCloud, editingCheckItemId, editingCheckItemText, editCheckItem, saveCheckItem, isOnline, sortedChecklist };
         }
     }).mount('#app');
 </script>
