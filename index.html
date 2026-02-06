@@ -46,7 +46,7 @@
         <div v-if="isLoading" class="loading-overlay">
             <i class="fa-solid fa-cloud-arrow-down text-4xl text-[#5d6b5b] mb-4 animate-bounce"></i>
             <p class="text-sm font-bold text-gray-500">正在連接資料庫...</p>
-            <p class="text-xs text-gray-400 mt-2">v27 頂部導覽版</p>
+            <p class="text-xs text-gray-400 mt-2">v28 日本地圖版</p>
             <button v-if="showSkipButton" @click="forceEnter" class="mt-6 border border-gray-300 px-4 py-2 rounded-full text-xs text-gray-400 hover:bg-gray-50">
                 連線逾時？點此離線進入
             </button>
@@ -231,7 +231,7 @@
                             </div>
                             <div class="bg-white p-5 rounded-[1.2rem] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.05)] border border-gray-100 relative transition-transform active:scale-[0.99]">
                                 <h3 class="text-lg font-bold text-gray-800 mb-1 leading-snug">{{ item.title }}</h3>
-                                <a v-if="item.location" :href="'http://googleusercontent.com/maps.google.com/6' + encodeURIComponent(item.location)" target="_blank"
+                                <a v-if="item.location" :href="'http://googleusercontent.com/maps.google.com/7' + encodeURIComponent(item.location)" target="_blank"
                                    class="inline-flex items-center gap-1.5 text-xs font-bold text-[#b86e6e] hover:bg-[#b86e6e]/10 px-2 py-1 rounded-lg -ml-2 transition-colors"><i class="fa-solid fa-location-dot"></i> {{ item.location }}</a>
                                 <div v-if="item.notes" class="mt-3 text-sm text-gray-600 bg-[#f9f9f7] p-3 rounded-xl leading-relaxed whitespace-pre-line border-l-2 border-[#dcdcdc]">{{ item.notes }}</div>
                                 <div class="absolute top-4 right-4 flex gap-3 opacity-30 group-hover:opacity-100 transition-opacity">
@@ -349,7 +349,21 @@
             const newExpense = ref({ item: '', amount: '', category: 'food', method: 'cash', date: new Date().toISOString().split('T')[0] });
 
             let map = null; let markers = [];
-            const initMap = () => { if(map) return; map = L.map('map', { zoomControl: false }).setView([34.6946, 135.1955], 13); L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO', subdomains: 'abcd', maxZoom: 20 }).addTo(map); L.control.zoom({ position: 'bottomright' }).addTo(map); updateMapMarkers(); };
+            
+            // GSI Maps Tile Layer (日本國土地理院)
+            const initMap = () => { 
+                if(map) return; 
+                map = L.map('map', { zoomControl: false }).setView([34.6946, 135.1955], 14); // 調整縮放層級
+                
+                L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">GSI Japan</a>',
+                    maxZoom: 18
+                }).addTo(map);
+                
+                L.control.zoom({ position: 'bottomright' }).addTo(map); 
+                updateMapMarkers(); 
+            };
+
             const updateMapMarkers = async () => { if(!map) return; markers.forEach(m => map.removeLayer(m)); markers = []; const items = itinerary.value.filter(i => i.dateKey === selectedDate.value); const locationDb = { "Kobe Airport": [34.6328, 135.2239], "remm plus Kobe Sannomiya": [34.6946, 135.1955], "Nunobiki Herb Gardens": [34.7163, 135.1910], "Grill Ippei": [34.7045, 135.1940], "Kobe Anpanman Museum": [34.6806, 135.1873], "Mosaic": [34.6795, 135.1860], "Kawasaki World": [34.6822, 135.1887], "Meriken Park": [34.6826, 135.1867], "Nankinmachi": [34.6882, 135.1880], "Familiar Kobe": [34.6870, 135.1890], "Daimaru Kobe": [34.6885, 135.1895], "Tonkatsu KYK": [34.6925, 135.1945], "Torimitsu": [34.6930, 135.1950] }; const bounds = L.latLngBounds(); items.forEach((item, index) => { let latlon = null; for (const [key, val] of Object.entries(locationDb)) { if ((item.location && item.location.includes(key)) || (item.title && item.title.includes(key))) latlon = val; } if(latlon) { const iconHtml = `<div style="background:#5d6b5b; color:white; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.3);">${index + 1}</div>`; const customIcon = L.divIcon({ html: iconHtml, className: 'custom-pin', iconSize: [24, 24] }); const marker = L.marker(latlon, { icon: customIcon }).addTo(map).bindPopup(item.title); markers.push(marker); bounds.extend(latlon); } }); if(items.length > 0 && markers.length > 0) map.fitBounds(bounds, { padding: [50, 50] }); };
 
             const switchTab = (tab) => { currentTab.value = tab; if(tab === 'map') nextTick(() => { initMap(); updateMapMarkers(); }); };
