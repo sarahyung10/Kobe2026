@@ -50,7 +50,7 @@
         <div v-if="isLoading" class="loading-overlay">
             <i class="fa-solid fa-cloud-arrow-down text-4xl text-[#5d6b5b] mb-4 animate-bounce"></i>
             <p class="text-sm font-bold text-gray-500">正在連接資料庫...</p>
-            <p class="text-xs text-gray-400 mt-2">v30 待買待吃版</p>
+            <p class="text-xs text-gray-400 mt-2">v31 智慧連動版</p>
             <button v-if="showSkipButton" @click="forceEnter" class="mt-6 border border-gray-300 px-4 py-2 rounded-full text-xs text-gray-400 hover:bg-gray-50">
                 連線逾時？點此離線進入
             </button>
@@ -129,20 +129,31 @@
                 </div>
 
                 <div class="bg-white p-6 rounded-[1.5rem] shadow-sm mb-4">
-                    <div class="flex gap-2 mb-6">
-                        <input type="text" v-model="newWishlistItem" :placeholder="wishlistType === 'buy' ? '輸入想買的東西...' : '輸入想吃的美食...'" class="flex-1 bg-gray-50 border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#b86e6e]" @keyup.enter="addWishlistItem">
-                        <button @click="addWishlistItem" class="bg-[#b86e6e] text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform"><i class="fa-solid fa-plus"></i></button>
+                    <div class="flex flex-col gap-2 mb-6">
+                        <div class="flex gap-2">
+                            <input type="text" v-model="newWishlistItem" :placeholder="wishlistType === 'buy' ? '輸入想買的東西...' : '輸入想吃的美食...'" class="flex-1 bg-gray-50 border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#b86e6e]">
+                            <button @click="addWishlistItem" class="bg-[#b86e6e] text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform w-14 flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                        <input type="text" v-model="newWishlistLocation" placeholder="在哪裡買/吃？(例如: Mosaic, 大丸)" class="w-full bg-gray-50 border-none rounded-xl px-4 py-2 text-xs outline-none focus:ring-2 focus:ring-[#b86e6e] text-gray-600">
+                        <p class="text-[10px] text-gray-400 ml-1"><i class="fa-solid fa-circle-info"></i> 輸入地點後，行程表會自動提示喔！</p>
                     </div>
+
                     <div class="space-y-2">
                         <transition-group name="list" tag="div">
-                            <div v-for="item in sortedWishlist" :key="item.id" class="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors group mb-2">
-                                <div class="flex items-center">
-                                    <input type="checkbox" v-model="item.checked" @change="syncToCloud" class="w-5 h-5 rounded-md border-gray-300 text-[#b86e6e] focus:ring-[#b86e6e] custom-checkbox transition-all cursor-pointer">
+                            <div v-for="item in sortedWishlist" :key="item.id" class="bg-white border border-gray-100 rounded-xl p-3 mb-2 hover:bg-gray-50 transition-colors">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex items-center gap-3 flex-1">
+                                        <input type="checkbox" v-model="item.checked" @change="syncToCloud" class="w-5 h-5 rounded-md border-gray-300 text-[#b86e6e] focus:ring-[#b86e6e] custom-checkbox cursor-pointer shrink-0 mt-0.5">
+                                        <div class="flex flex-col">
+                                            <span :class="['text-sm font-bold transition-all', item.checked ? 'text-gray-300 line-through' : 'text-gray-700']">{{ item.text }}</span>
+                                            <span v-if="item.location" class="text-[10px] text-[#5d6b5b] font-bold mt-0.5"><i class="fa-solid fa-location-dot"></i> {{ item.location }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button v-if="!item.checked" @click="planWish(item)" class="text-gray-300 hover:text-[#5d6b5b] p-1" title="排入行程"><i class="fa-regular fa-calendar-plus"></i></button>
+                                        <button @click="deleteWishlistItem(item.id)" class="text-gray-300 hover:text-red-400 p-1"><i class="fa-solid fa-trash-can"></i></button>
+                                    </div>
                                 </div>
-                                <div class="flex-1 ml-3 py-1">
-                                    <span :class="['text-sm font-medium transition-all block', item.checked ? 'text-gray-300 line-through' : 'text-gray-700']">{{ item.text }}</span>
-                                </div>
-                                <button @click="deleteWishlistItem(item.id)" class="text-gray-300 hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition-opacity ml-2"><i class="fa-solid fa-trash-can"></i></button>
                             </div>
                         </transition-group>
                         <div v-if="sortedWishlist.length === 0" class="text-center text-gray-300 text-xs py-4">
@@ -277,9 +288,20 @@
                             </div>
                             <div class="bg-white p-5 rounded-[1.2rem] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.05)] border border-gray-100 relative transition-transform active:scale-[0.99]">
                                 <h3 class="text-lg font-bold text-gray-800 mb-1 leading-snug">{{ item.title }}</h3>
-                                <a v-if="item.location" :href="'http://googleusercontent.com/maps.google.com/9' + encodeURIComponent(item.location)" target="_blank"
+                                <a v-if="item.location" :href="'https://www.google.com/maps/search/?api=1&query=remm+plus+Kobe+Sannomiya770' + encodeURIComponent(item.location)" target="_blank"
                                    class="inline-flex items-center gap-1.5 text-xs font-bold text-[#b86e6e] hover:bg-[#b86e6e]/10 px-2 py-1 rounded-lg -ml-2 transition-colors"><i class="fa-solid fa-location-dot"></i> {{ item.location }}</a>
                                 <div v-if="item.notes" class="mt-3 text-sm text-gray-600 bg-[#f9f9f7] p-3 rounded-xl leading-relaxed whitespace-pre-line border-l-2 border-[#dcdcdc]">{{ item.notes }}</div>
+                                
+                                <div v-if="getMatchedWishes(item.location).length > 0" class="mt-3 border-t border-gray-100 pt-3">
+                                    <p class="text-[10px] font-bold text-gray-400 mb-1"><i class="fa-solid fa-bell text-yellow-400"></i> 順路買/吃：</p>
+                                    <div class="flex flex-wrap gap-1">
+                                        <span v-for="wish in getMatchedWishes(item.location)" :key="wish.id" 
+                                              :class="['text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1', wish.type === 'buy' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100']">
+                                            <i :class="wish.type === 'buy' ? 'fa-solid fa-bag-shopping' : 'fa-solid fa-utensils'"></i> {{ wish.text }}
+                                        </span>
+                                    </div>
+                                </div>
+
                                 <div class="absolute top-4 right-4 flex gap-3 opacity-30 group-hover:opacity-100 transition-opacity">
                                     <button @click="editItinerary(item)" class="text-gray-400 hover:text-[#5d6b5b]"><i class="fa-solid fa-pen"></i></button>
                                     <button @click="deleteItinerary(item.id)" class="text-gray-400 hover:text-red-400"><i class="fa-solid fa-trash-can"></i></button>
@@ -369,10 +391,11 @@
             const editingCheckItemText = ref('');
             const isOnline = ref(false);
             
-            // v30 新增：願望清單相關
-            const wishlistType = ref('buy'); // 'buy' or 'eat'
+            // v30+v31: 願望清單
+            const wishlistType = ref('buy');
             const wishlistItems = ref([]);
             const newWishlistItem = ref('');
+            const newWishlistLocation = ref(''); // 新增：地點
 
             const dates = [ { key: '2026-03-05', label: '3/5 (四)' }, { key: '2026-03-06', label: '3/6 (五)' }, { key: '2026-03-07', label: '3/7 (六)' }, { key: '2026-03-08', label: '3/8 (日)' } ];
             const selectedDate = ref('2026-03-05'); 
@@ -424,7 +447,7 @@
                     itinerary: itinerary.value,
                     expenses: expenses.value,
                     checklistItems: checklistItems.value,
-                    wishlistItems: wishlistItems.value, // 新增：同步願望清單
+                    wishlistItems: wishlistItems.value,
                     cashBudget: cashBudget.value
                 });
             };
@@ -432,19 +455,40 @@
             const addCheckItem = () => { if(!newCheckItem.value.trim()) return; checklistItems.value.push({ id: Date.now(), text: newCheckItem.value, checked: false }); newCheckItem.value = ''; syncToCloud(); };
             const deleteCheckItem = (id) => { checklistItems.value = checklistItems.value.filter(i => i.id !== id); syncToCloud(); };
             
-            // v30 新增：願望清單功能
+            // 願望清單
             const addWishlistItem = () => {
                 if(!newWishlistItem.value.trim()) return;
                 wishlistItems.value.push({
                     id: Date.now(),
                     text: newWishlistItem.value,
-                    type: wishlistType.value, // 'buy' or 'eat'
+                    type: wishlistType.value,
+                    location: newWishlistLocation.value.trim(), // 儲存地點
                     checked: false
                 });
                 newWishlistItem.value = '';
+                newWishlistLocation.value = '';
                 syncToCloud();
             };
             const deleteWishlistItem = (id) => { wishlistItems.value = wishlistItems.value.filter(i => i.id !== id); syncToCloud(); };
+            
+            // v31: 將願望直接排入行程
+            const planWish = (wish) => {
+                currentTab.value = 'schedule'; // 切換到行程頁
+                openAddModal(); // 打開新增視窗
+                newItem.value.title = (wish.type === 'buy' ? '買：' : '吃：') + wish.text; // 自動填入標題
+                newItem.value.location = wish.location || ''; // 自動填入地點
+            };
+
+            // v31: 智慧連動 - 檢查行程地點是否有符合的願望
+            const getMatchedWishes = (itineraryLocation) => {
+                if (!itineraryLocation) return [];
+                // 檢查邏輯：願望還沒完成 + 有地點 + 地點名稱包含在行程地點中 (例如: "Mosaic" 在 "Mosaic Kobe" 裡面)
+                return wishlistItems.value.filter(w => 
+                    !w.checked && 
+                    w.location && 
+                    (itineraryLocation.includes(w.location) || w.location.includes(itineraryLocation))
+                );
+            };
 
             const editCheckItem = (item) => {
                 editingCheckItemId.value = item.id;
@@ -478,16 +522,14 @@
             const remainingCash = computed(() => cashBudget.value - expenses.value.filter(e => e.method === 'cash').reduce((acc, e) => acc + Number(e.amount), 0));
             const groupedExpenses = computed(() => { const groups = {}; [...expenses.value].sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(exp => { if(!groups[exp.date]) { const dateObj = dates.find(d => d.key === exp.date); groups[exp.date] = { date: exp.date, label: dateObj ? dateObj.label : exp.date, items: [], subtotal: 0 }; } groups[exp.date].items.push(exp); groups[exp.date].subtotal += Number(exp.amount); }); return Object.values(groups); });
             
-            // 排序邏輯：未完成在先
             const sortedChecklist = computed(() => {
                 return [...checklistItems.value].sort((a, b) => (a.checked === b.checked) ? 0 : a.checked ? 1 : -1);
             });
             
-            // v30 新增：願望清單排序與篩選
             const sortedWishlist = computed(() => {
                 return wishlistItems.value
-                    .filter(item => item.type === wishlistType.value) // 先篩選目前的分頁 (buy/eat)
-                    .sort((a, b) => (a.checked === b.checked) ? 0 : a.checked ? 1 : -1); // 再排序
+                    .filter(item => item.type === wishlistType.value)
+                    .sort((a, b) => (a.checked === b.checked) ? 0 : a.checked ? 1 : -1);
             });
 
             watch(selectedDate, () => { if(flightData[selectedDate.value]) { currentFlightStatus.value = '更新中...'; setTimeout(() => { currentFlightStatus.value = selectedDate.value === '2026-03-05' ? '準點 On Time' : '計劃中 Scheduled'; }, 800); } newItem.value.dateKey = selectedDate.value; if(currentTab.value === 'map') updateMapMarkers(); });
@@ -512,7 +554,7 @@
                         itinerary.value = data.itinerary || [];
                         expenses.value = data.expenses || [];
                         checklistItems.value = data.checklistItems || [];
-                        wishlistItems.value = data.wishlistItems || []; // 載入願望清單
+                        wishlistItems.value = data.wishlistItems || [];
                         cashBudget.value = data.cashBudget || 0;
                     } else {
                         // Default Data
@@ -526,7 +568,7 @@
                 fetchWeather(); fetchRate();
             });
 
-            return { currentTab, showModal, dates, selectedDate, exchangeRate, itinerary, expenses, newItem, newExpense, weatherData, checklistItems, newCheckItem, editingId, categories, currentDateItinerary, totalExpense, currentWeather, totalTWD, cashBudget, remainingCash, groupedExpenses, currentFlight, currentFlightStatus, saveItem, deleteItinerary, deleteExpense, switchTab, addCheckItem, deleteCheckItem, openAddModal, editItinerary, formatNumber, formatDate, getWeatherIcon, getDayLabel, fetchRate, getCategoryIcon, isLoading, showSkipButton, forceEnter, syncToCloud, editingCheckItemId, editingCheckItemText, editCheckItem, saveCheckItem, isOnline, sortedChecklist, wishlistType, newWishlistItem, sortedWishlist, addWishlistItem, deleteWishlistItem };
+            return { currentTab, showModal, dates, selectedDate, exchangeRate, itinerary, expenses, newItem, newExpense, weatherData, checklistItems, newCheckItem, editingId, categories, currentDateItinerary, totalExpense, currentWeather, totalTWD, cashBudget, remainingCash, groupedExpenses, currentFlight, currentFlightStatus, saveItem, deleteItinerary, deleteExpense, switchTab, addCheckItem, deleteCheckItem, openAddModal, editItinerary, formatNumber, formatDate, getWeatherIcon, getDayLabel, fetchRate, getCategoryIcon, isLoading, showSkipButton, forceEnter, syncToCloud, editingCheckItemId, editingCheckItemText, editCheckItem, saveCheckItem, isOnline, sortedChecklist, wishlistType, newWishlistItem, sortedWishlist, addWishlistItem, deleteWishlistItem, newWishlistLocation, planWish, getMatchedWishes };
         }
     }).mount('#app');
 </script>
