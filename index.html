@@ -40,6 +40,11 @@
         .list-enter-from, .list-leave-to { opacity: 0; transform: translateX(30px); }
         .list-leave-active { position: absolute; }
         .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.95); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        
+        /* v36: 交通圖例樣式 */
+        .map-legend { position: absolute; bottom: 20px; left: 10px; background: rgba(255,255,255,0.95); padding: 10px; border-radius: 12px; font-size: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; border: 1px solid #eee; width: 140px; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 4px; }
+        .color-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; display: inline-block; }
     </style>
 </head>
 <body>
@@ -50,7 +55,7 @@
         <div v-if="isLoading" class="loading-overlay">
             <i class="fa-solid fa-cloud-arrow-down text-4xl text-[#5d6b5b] mb-4 animate-bounce"></i>
             <p class="text-sm font-bold text-gray-500">正在連接資料庫...</p>
-            <p class="text-xs text-gray-400 mt-2">v34 地圖連結修正版</p>
+            <p class="text-xs text-gray-400 mt-2">v36 交通圖例版</p>
             <button v-if="showSkipButton" @click="forceEnter" class="mt-6 border border-gray-300 px-4 py-2 rounded-full text-xs text-gray-400 hover:bg-gray-50">
                 連線逾時？點此離線進入
             </button>
@@ -322,12 +327,23 @@
                         <button v-for="date in dates" :key="date.key" @click="selectedDate = date.key"
                             :class="['flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border', selectedDate === date.key ? 'bg-[#5d6b5b] text-white border-[#5d6b5b] shadow-md' : 'bg-white text-gray-500 border-gray-200']">{{ date.label }}</button>
                      </div>
-                     <a href="https://www.city.kobe.lg.jp/documents/1828/subway_rosenzu_2406.pdf" target="_blank" 
+                     <a href="https://www.westjr.co.jp/global/tc/timetable/pdf/map_kobe.pdf" target="_blank" 
                         class="absolute right-4 top-14 bg-white/90 backdrop-blur border border-gray-200 shadow-md text-[#5d6b5b] text-xs font-bold px-3 py-2 rounded-full flex items-center gap-1 z-50 hover:bg-gray-50 transition-colors">
                          <i class="fa-solid fa-map"></i> 路線圖 PDF
                      </a>
                  </div>
-                 <div class="flex-1 relative"><div id="map" class="absolute inset-0 w-full h-full"></div></div>
+                 <div class="flex-1 relative">
+                     <div id="map" class="absolute inset-0 w-full h-full"></div>
+                     
+                     <div class="map-legend" v-if="!showModal">
+                         <div class="font-bold text-[#5d6b5b] mb-2 border-b border-gray-100 pb-1">車站/路線代表色</div>
+                         <div class="legend-item"><span class="color-dot bg-[#0072bc]"></span> JR 線 (藍)</div>
+                         <div class="legend-item"><span class="color-dot bg-[#a62e3d]"></span> 阪急電鐵 (栗紅)</div>
+                         <div class="legend-item"><span class="color-dot bg-[#e8a200]"></span> 阪神電車 (橘黃)</div>
+                         <div class="legend-item"><span class="color-dot bg-[#1e9944]"></span> 地下鐵 (綠/藍)</div>
+                         <div class="legend-item"><span class="color-dot bg-[#e60012]"></span> Port Liner (紅)</div>
+                     </div>
+                 </div>
             </div>
 
         </main>
@@ -440,13 +456,13 @@
                 if(map) return; 
                 map = L.map('map', { zoomControl: false }).setView([34.6946, 135.1955], 14); 
                 
-                // 日本 GSI 地圖 (底圖)
-                L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
-                    attribution: '© <a href="https://maps.gsi.go.jp/development/ichiran.html">GSI Japan</a>',
-                    maxZoom: 18
+                // v35: 使用極簡灰階底圖 (CartoDB Light)
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '©OpenStreetMap, ©CartoDB',
+                    maxZoom: 20
                 }).addTo(map);
 
-                // v33: OpenRailwayMap (鐵道圖層 - 疊加)
+                // OpenRailwayMap (鐵道圖層 - 疊加)
                 L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', {
                     maxZoom: 19,
                     attribution: 'Map data: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Map style: © <a href="https://www.OpenRailwayMap.org">OpenRailwayMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
