@@ -55,7 +55,7 @@
         <div v-if="isLoading" class="loading-overlay">
             <i class="fa-solid fa-cloud-arrow-down text-4xl text-[#5d6b5b] mb-4 animate-bounce"></i>
             <p class="text-sm font-bold text-gray-500">正在連接資料庫...</p>
-            <p class="text-xs text-gray-400 mt-2">v36 交通圖例版</p>
+            <p class="text-xs text-gray-400 mt-2">v38 智能搜尋版</p>
             <button v-if="showSkipButton" @click="forceEnter" class="mt-6 border border-gray-300 px-4 py-2 rounded-full text-xs text-gray-400 hover:bg-gray-50">
                 連線逾時？點此離線進入
             </button>
@@ -139,7 +139,7 @@
                             <input type="text" v-model="newWishlistItem" :placeholder="wishlistType === 'buy' ? '輸入想買的東西...' : '輸入想吃的美食...'" class="flex-1 bg-gray-50 border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#b86e6e]" @keyup.enter="addWishlistItem">
                             <button @click="addWishlistItem" class="bg-[#b86e6e] text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform w-14 flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
                         </div>
-                        <input type="text" v-model="newWishlistLocation" placeholder="在哪裡買/吃？(例如: Mosaic, 大丸)" class="w-full bg-gray-50 border-none rounded-xl px-4 py-2 text-xs outline-none focus:ring-2 focus:ring-[#b86e6e] text-gray-600">
+                        <input type="text" v-model="newWishlistLocation" placeholder="地點 (可輸入日文/中文，例如: レムプラス)" class="w-full bg-gray-50 border-none rounded-xl px-4 py-2 text-xs outline-none focus:ring-2 focus:ring-[#b86e6e] text-gray-600">
                     </div>
 
                     <div class="space-y-2">
@@ -451,7 +451,9 @@
             const newExpense = ref({ item: '', amount: '', category: 'food', method: 'cash', date: new Date().toISOString().split('T')[0] });
 
             let map = null; let markers = [];
-            
+            // 地點座標快取 (Simple Cache)
+            const geoCache = {};
+
             const initMap = () => { 
                 if(map) return; 
                 map = L.map('map', { zoomControl: false }).setView([34.6946, 135.1955], 14); 
@@ -472,7 +474,92 @@
                 updateMapMarkers(); 
             };
 
-            const updateMapMarkers = async () => { if(!map) return; markers.forEach(m => map.removeLayer(m)); markers = []; const items = itinerary.value.filter(i => i.dateKey === selectedDate.value); const locationDb = { "Kobe Airport": [34.6328, 135.2239], "remm plus Kobe Sannomiya": [34.6946, 135.1955], "Nunobiki Herb Gardens": [34.7163, 135.1910], "Grill Ippei": [34.7045, 135.1940], "Kobe Anpanman Museum": [34.6806, 135.1873], "Mosaic": [34.6795, 135.1860], "Kawasaki World": [34.6822, 135.1887], "Meriken Park": [34.6826, 135.1867], "Nankinmachi": [34.6882, 135.1880], "Familiar Kobe": [34.6870, 135.1890], "Daimaru Kobe": [34.6885, 135.1895], "Tonkatsu KYK": [34.6925, 135.1945], "Torimitsu": [34.6930, 135.1950] }; const bounds = L.latLngBounds(); items.forEach((item, index) => { let latlon = null; for (const [key, val] of Object.entries(locationDb)) { if ((item.location && item.location.includes(key)) || (item.title && item.title.includes(key))) latlon = val; } if(latlon) { const iconHtml = `<div style="background:#5d6b5b; color:white; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.3);">${index + 1}</div>`; const customIcon = L.divIcon({ html: iconHtml, className: 'custom-pin', iconSize: [24, 24] }); const marker = L.marker(latlon, { icon: customIcon }).addTo(map).bindPopup(item.title); markers.push(marker); bounds.extend(latlon); } }); if(items.length > 0 && markers.length > 0) map.fitBounds(bounds, { padding: [50, 50] }); };
+            // v38: 異步更新地圖標記 (支援自動搜尋)
+            const updateMapMarkers = async () => { 
+                if(!map) return; 
+                markers.forEach(m => map.removeLayer(m)); 
+                markers = []; 
+                const items = itinerary.value.filter(i => i.dateKey === selectedDate.value); 
+                
+                // 1. 內建靜態資料庫 (優先使用，秒開)
+                const locationDb = {
+                    // 您的飯店 & 交通
+                    "Kobe Airport": [34.6328, 135.2239], "神戶機場": [34.6328, 135.2239], "空港": [34.6328, 135.2239], "機場": [34.6328, 135.2239],
+                    "Sannomiya": [34.6946, 135.1955], "三宮": [34.6946, 135.1955],
+                    "Shin-Kobe": [34.7061, 135.1963], "新神戶": [34.7061, 135.1963],
+                    "remm": [34.6938, 135.1945], "雷姆": [34.6938, 135.1945], "レム": [34.6938, 135.1945],
+                    "Oriental": [34.6853, 135.1889], "東方酒店": [34.6853, 135.1889], "オリエンタル": [34.6853, 135.1889],
+                    "Okura": [34.6872, 135.1905], "大倉": [34.6872, 135.1905], "オークラ": [34.6872, 135.1905],
+                    "Portopia": [34.6653, 135.2117], "波多比亞": [34.6653, 135.2117], "ポートピア": [34.6653, 135.2117],
+                    
+                    // 景點
+                    "Anpanman": [34.6806, 135.1873], "麵包超人": [34.6806, 135.1873], "アンパンマン": [34.6806, 135.1873],
+                    "Mosaic": [34.6795, 135.1860], "馬賽克": [34.6795, 135.1860], "モザイク": [34.6795, 135.1860],
+                    "Kawasaki": [34.6822, 135.1887], "川崎重工": [34.6822, 135.1887],
+                    "Port Tower": [34.6826, 135.1867], "神戶塔": [34.6826, 135.1867], "神戶港": [34.6826, 135.1867],
+                    "Nankinmachi": [34.6882, 135.1880], "南京町": [34.6882, 135.1880], "中華街": [34.6882, 135.1880],
+                    "Herb Gardens": [34.7163, 135.1910], "布引香草園": [34.7163, 135.1910], "香草園": [34.7163, 135.1910], "布引": [34.7163, 135.1910],
+                    "Animal Kingdom": [34.6545, 135.2173], "動物王國": [34.6545, 135.2173], "どうぶつ王国": [34.6545, 135.2173],
+                    "Ikuta Shrine": [34.6953, 135.1905], "生田神社": [34.6953, 135.1905],
+                    "Kitano": [34.7024, 135.1895], "北野異人館": [34.7024, 135.1895], "異人館": [34.7024, 135.1895],
+                    
+                    // 購物 & 餐廳
+                    "Familiar": [34.6870, 135.1890],
+                    "Daimaru": [34.6885, 135.1895], "大丸": [34.6885, 135.1895],
+                    "Umie": [34.6800, 135.1840],
+                    "Nishimatsuya": [34.6792, 135.1835], "西松屋": [34.6792, 135.1835],
+                    "Akachan": [34.6795, 135.1845], "阿卡將": [34.6795, 135.1845], "本舖": [34.6795, 135.1845],
+                    "Grill Ippei": [34.7045, 135.1940],
+                    "Tonkatsu KYK": [34.6925, 135.1945],
+                    "Torimitsu": [34.6930, 135.1950],
+                    "Steak Land": [34.6935, 135.1925], "牛排": [34.6935, 135.1925]
+                };
+
+                const bounds = L.latLngBounds(); 
+                
+                // 2. 輔助函式：取得座標 (內建 -> 快取 -> API)
+                const getCoords = async (query) => {
+                    if (!query) return null;
+                    // (A) 查內建
+                    for (const [key, val] of Object.entries(locationDb)) { 
+                        if (query.toLowerCase().includes(key.toLowerCase())) return val;
+                    }
+                    // (B) 查快取
+                    if (geoCache[query]) return geoCache[query];
+
+                    // (C) 查 OpenStreetMap API (Nomintim) - 僅當內建找不到時才執行
+                    try {
+                        // 加上 "Kobe" 增加準確度
+                        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' Kobe')}&limit=1`);
+                        const data = await res.json();
+                        if (data && data.length > 0) {
+                            const latlon = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+                            geoCache[query] = latlon; // 存入快取
+                            return latlon;
+                        }
+                    } catch (e) {
+                        console.error("Geocoding failed", e);
+                    }
+                    return null;
+                };
+
+                // 3. 逐一處理每個行程
+                for (const [index, item] of items.entries()) {
+                    // 優先用 location 欄位，沒有則用 title
+                    const query = item.location || item.title;
+                    const latlon = await getCoords(query);
+                    
+                    if(latlon) { 
+                        const iconHtml = `<div style="background:#5d6b5b; color:white; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.3);">${index + 1}</div>`; 
+                        const customIcon = L.divIcon({ html: iconHtml, className: 'custom-pin', iconSize: [24, 24] }); 
+                        const marker = L.marker(latlon, { icon: customIcon }).addTo(map).bindPopup(`<b>${item.title}</b><br>${item.location || ''}`); 
+                        markers.push(marker); 
+                        bounds.extend(latlon); 
+                    }
+                }
+                
+                if(items.length > 0 && markers.length > 0) map.fitBounds(bounds, { padding: [50, 50] }); 
+            };
 
             const switchTab = (tab) => { currentTab.value = tab; if(tab === 'map') nextTick(() => { initMap(); updateMapMarkers(); }); };
             const openAddModal = () => { editingId.value = null; newItem.value = { dateKey: selectedDate.value, time: '10:00', title: '', location: '', notes: '' }; newExpense.value = { item: '', amount: '', category: 'food', method: 'cash', date: new Date().toISOString().split('T')[0] }; showModal.value = true; };
